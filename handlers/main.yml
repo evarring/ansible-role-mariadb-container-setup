@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: MIT-0
+---
+# handlers file for mariadb_container_setup
+
+- name: Stop containers
+  community.docker.docker_container:
+    name: "{{ mariadbname_item }}"
+    state: "stopped"
+  loop:
+    - "{{ mariadb_container_setup_name }}"
+  loop_control:
+    loop_var: mariadbname_item

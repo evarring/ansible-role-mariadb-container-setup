@@ -1,0 +1,83 @@
+# SPDX-License-Identifier: MIT-0
+---
+# tasks file for mariadb_container_setup
+
+# https://hub.docker.com/_/mariadb
+
+- name: Pull the configured images if they haven't already and stop containers if changed
+  notify: Stop containers
+  block:
+    - name: Pull the configured images if they haven't already
+      community.docker.docker_image:
+        name: "{{ mariadbimage_item }}"
+        source: pull
+      loop:
+        - "{{ mariadb_container_setup_image }}"
+      loop_control:
+        loop_var: mariadbimage_item
+      register: mariadb_image_pull_result
+
+    - name: Flush handlers immediately
+      ansible.builtin.meta: flush_handlers
+      when: mariadb_image_pull_result.changed # noqa: no-handler
+
+- name: Ensure mariadb container is stopped when recreating
+  when: mariadb_container_setup_recreate
+  block:
+    - name: Notify the handler
+      ansible.builtin.debug:
+        msg: "Stopping containers for recreation"
+      notify: Stop containers
+      changed_when: true
+
+    - name: Flush handlers immediately
+      ansible.builtin.meta: flush_handlers
+
+- name: Ensure mariadb container volume directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0744'
+    owner: "{{ ansible_user | default(root) }}"
+    group: "{{ ansible_user | default(root) }}"
+  loop:
+    - "{{ mariadb_container_setup_dir }}"
+    - "{{ mariadb_container_setup_backup_dir }}"
+  become: true
+
+- name: Create networks
+  community.docker.docker_network:
+    name: "{{ item.name }}"
+  loop: "{{ mariadb_container_setup_networks }}"
+  become: true
+
+- name: Create mariadb container
+  community.docker.docker_container:
+    name: "{{ mariadb_container_setup_name }}"
+    image: "{{ mariadb_container_setup_image }}"
+    state: "{{ mariadb_container_setup_state | default('started') }}"
+    network_mode: "{{ mariadb_container_setup_network_mode }}"
+    networks: "{{ mariadb_container_setup_networks }}"
+    cpus: "{{ mariadb_container_setup_cpus }}"
+    memory: "{{ mariadb_container_setup_memory }}"
+    healthcheck: "{{ mariadb_container_setup_healthcheck | default(omit) }}"
+    recreate: "{{ mariadb_container_setup_recreate }}"
+    privileged: "{{ mariadb_container_setup_privileged }}"
+    user: "{{ mariadb_container_setup_user_uid_gid | default(omit) }}"
+    ports: "{{ mariadb_container_setup_ports }}"
+    volumes:
+      - "{{ mariadb_container_setup_dir }}/:/var/lib/mysql/:rw,Z"
+      - "{{ mariadb_container_setup_backup_dir }}/:/mariadb_backup:rw,Z"
+    env: "{{ mariadb_container_setup_env | default(omit) }}"
+    labels: "{{ mariadb_container_setup_labels }}"
+    restart_policy: "{{ mariadb_container_setup_restart_policy }}"
+
+- name: Enable linger for user {{ ansible_user | default('root') }}
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/loginctl
+      - enable-linger
+      - "{{ ansible_user | default('root') }}"
+    creates: "/var/lib/systemd/linger/{{ ansible_user | default('root') }}"
+  become: true
+  when: ansible_virtualization_type != "container"

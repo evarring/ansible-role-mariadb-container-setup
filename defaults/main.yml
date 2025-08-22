@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: MIT-0
+---
+# defaults file for mariadb_container_setup
+
+mariadb_container_setup_name: mariadb
+mariadb_container_setup_networks:
+  - name: mariadb
+
+mariadb_container_setup_image: docker.io/mariadb:latest-ubi9
+mariadb_container_setup_labels:
+  traefik.enable: "false"
+mariadb_container_setup_dir: /srv/mariadb
+mariadb_container_setup_backup_dir: /srv/mariadb_backup
+mariadb_container_setup_user_uid_gid: "1000:1000"
+
+mariadb_container_setup_ports:
+  - "3306:3306"
+
+mariadb_container_setup_env:
+  MARIADB_ROOT_PASSWORD: example
+
+mariadb_container_setup_recreate: true
+mariadb_container_setup_privileged: false
+mariadb_container_setup_restart_policy: unless-stopped
+
+mariadb_container_setup_cpus: 1
+mariadb_container_setup_memory: 512M
